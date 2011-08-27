@@ -9,3 +9,8 @@ Description: A custom theme made for speed and mobile devices.
 @import url(style-large.css) screen and (min-width: 801px);
 @import url(style-small.css) screen and (max-width: 800px);
 
+#article {
+font-size: 0.8em;
+font-weight: normal;
+line-height: 1.2em;
+}

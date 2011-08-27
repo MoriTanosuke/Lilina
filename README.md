@@ -12,11 +12,11 @@ Requirements
 * The <a href="http://php.net/xml">XML entension</a>
 * Support for <a href="http://php.net/pcre">PCRE</a>
 * Either:
-** The <a href="http://php.net/mbstring">mbstring</a> extension <strong>or</strong>
-** The <a href="http://php.net/iconv">iconv</a> extension
+  * The <a href="http://php.net/mbstring">mbstring</a> extension <strong>or</strong>
+  * The <a href="http://php.net/iconv">iconv</a> extension
 * Either:
-* Support for socket connections (see <a href="http://php.net/manual/en/function.fsockopen.php">the PHP manual entry on fsockopen</a>) <strong>or</strong>
-* The cURL extension (see <a href="http://au.php.net/curl">the PHP manual entry on cURL</a>)
+  * Support for socket connections (see <a href="http://php.net/manual/en/function.fsockopen.php">the PHP manual entry on fsockopen</a>) <strong>or</strong>
+  * The cURL extension (see <a href="http://au.php.net/curl">the PHP manual entry on cURL</a>)
 
 That's it! No PEAR packages are needed and no MySQL, PostgreSQL or SQLite databases are needed. Lilina is fully self-contained and uses flat-files instead of databases.
 
