@@ -23,7 +23,7 @@ That's it! No PEAR packages are needed and no MySQL, PostgreSQL or SQLite databa
 Installation
 ============
 
-Upload to your server and then simply open up <a href="install.php">install.php</a> in your browser.
+Upload to your server and then simply open up <code>install.php</code> in your browser.
 
 Permissions
 -----------
@@ -46,7 +46,7 @@ Support is available from the <a href="http://getlilina.org/docs/support">Lilina
 Copyright
 =========
 
-Lilina is released under the <abbr title="GNU Public License">GPL</abbr> (see <a href="license.txt">license.txt</a>).
+Lilina is released under the <abbr title="GNU Public License">GPL</abbr> (see <code>license.txt</code>).
 
 Code from the following projects is used in Lilina:
 
