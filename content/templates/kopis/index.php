@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="http://code.jquery.com/mobile/1.0.1/jquery.mobile-1.0.1.min.css" />
 <script src="http://code.jquery.com/jquery-1.6.4.min.js"></script>
 <script src="http://code.jquery.com/mobile/1.0.1/jquery.mobile-1.0.1.min.js"></script>
+<script src="http://flesler-plugins.googlecode.com/files/jquery.scrollTo-1.4.2-min.js"></script>
+<script src="<?php echo Templates::get_url('hotkeys.js'); ?>" type="text/javascript"></script>
 <?php template_header(); ?>
 </head> 
 
@@ -31,7 +33,7 @@
     </ul>
 </div><!-- header -->
 
-<div data-role="content">
+<div data-role="content" id="articles">
     <ul data-role="listview" data-inset="true">
 <?php while(has_items()): the_item(); ?>
 	<?php the_date('before=<li data-role="list-divider" title="' . _r('Click to expand/collapse date') . '"> &after=</li>&format=l d F, Y') ?>
@@ -51,6 +53,9 @@
 <div data-role="footer">
 </div>
 </div><!-- page -->
+<script type="text/javascript">
+$(document).ready(function (){init_keys();});
+</script>
 </body>
 </html>
 
