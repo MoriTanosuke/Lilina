@@ -4,9 +4,7 @@
 <title><?php template_sitename(); ?></title> 
 <meta name="viewport" content="width=device-width, initial-scale=1;"/> 
 <link rel="shortcut icon" href="favicon.ico" type="image/x-icon" />
-<!--
 <link rel="stylesheet" href="<?php echo Templates::get_url('style.css'); ?>" type="text/css" />
--->
 <link rel="stylesheet" href="http://code.jquery.com/mobile/1.0.1/jquery.mobile-1.0.1.min.css" />
 <script src="http://code.jquery.com/jquery-1.6.4.min.js"></script>
 <script src="http://code.jquery.com/mobile/1.0.1/jquery.mobile-1.0.1.min.js"></script>
@@ -37,9 +35,8 @@
     <ul data-role="listview" data-inset="true">
 <?php while(has_items()): the_item(); ?>
 	<?php the_date('before=<li data-role="list-divider" title="' . _r('Click to expand/collapse date') . '"> &after=</li>&format=l d F, Y') ?>
-	<li>
-	<h1 id="article-<?php the_id(); ?>"><?php the_feed_name() ?> - <?php the_title(); ?></h1>
-	<?php the_content(); ?><?php if(has_enclosure()) { ?><?php the_enclosure(); ?><?php } ?>
+	<li data-role="list-divider"><h1 id="article-<?php the_id(); ?>"><img src="<?php the_feed_favicon(); ?>" />&nbsp;<?php the_feed_name() ?> - <?php the_title(); ?> at <?php the_date('&format=h:m:s'); ?></h1></li>
+	<li><div class="article"><?php the_content(); ?><?php if(has_enclosure()) { ?><?php the_enclosure(); ?><?php } ?></div>
 	</li>
 <?php endwhile; ?> 
     </ul>
