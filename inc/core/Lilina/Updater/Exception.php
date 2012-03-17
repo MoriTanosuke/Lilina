@@ -12,12 +12,12 @@
  * @package Lilina
  * @subpackage HTTP
  */
-class Lilina_HTTP_Exception extends Exception {
+class Lilina_Updater_Exception extends Exception {
 	protected $type;
 	protected $data;
 
-	public function __construct($message, $type, $data = null) {
-		parent::__construct($message, 0);
+	public function __construct($message, $type, $data = null, $previous = null) {
+		parent::__construct($message, 0, $previous);
 
 		$this->type = $type;
 		$this->data = $data;

@@ -96,7 +96,7 @@ class ItemUpdater {
 		$sp = new SimplePie();
 		$sp->set_stupidly_fast(true);
 		$sp->set_cache_location(get_option('cachedir'));
-		//$sp->set_cache_duration(0);
+		$sp->set_cache_duration(0);
 		$sp->set_file_class('Lilina_SimplePie_File');
 		$sp = apply_filters('simplepie-config', $sp);
 
@@ -114,7 +114,7 @@ class ItemUpdater {
 		usort($sp->data['ordered_items'], array(&$sp, 'sort_items'));
 		usort($sp->data['items'], array(&$sp, 'sort_items'));
 
-		do_action_ref_array('iu-load-feed', array(&$sp, $feed));
+		Lilina_Plugins::filter_reference('iu-load-feed', array(&$sp, $feed));
 		return $sp;
 	}
 

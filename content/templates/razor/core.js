@@ -25,6 +25,10 @@ Date.prototype.toRelativeTime = function() {
 		}
 	}
 
+	if (delta < 0) {
+		return this.toHumanString();
+	}
+
 	// pluralize a unit when the difference is greater than 1.
 	delta = Math.floor(delta);
 	if(delta !== 1) { units += "s"; }
@@ -37,6 +41,34 @@ Date.prototype.toRelativeTime = function() {
  */
 Date.fromString = function(str) {
 	return new Date(Date.parse(str));
+};
+
+String.prototype.lpad = function (padding, length) {
+	var string = this;
+	while (string.length < length) {
+		string = padding + string;
+	}
+
+	return string;
+};
+String.prototype.rpad = function (padding, length) {
+	var string = this;
+	while (string.length < length) {
+		string += padding;
+	}
+
+	return string;
+};
+
+Date.prototype.toHumanString = function () {
+	var string = this.getFullYear();
+	string += '-' + (this.getMonth() + 1).toString().lpad("0", 2);
+	string += '-' + (this.getDate() + 1).toString().lpad("0", 2);
+	string += ' ' + this.getHours().toString().lpad("0", 2);
+	string += ':' + this.getMinutes().toString().lpad("0", 2);
+	string += ':' + this.getSeconds().toString().lpad("0", 2);
+
+	return string;
 };
 
 (function($) {
@@ -58,6 +90,55 @@ Date.fromString = function(str) {
 		this.each(function() {
 			var $this = $(this);
 			$this.text(Date.fromString($this.html()).toRelativeTime());
+		});
+	};
+})(jQuery);
+
+
+
+/* Resizer */
+(function($){
+	$.resizeHandle = {
+		drag: function (event) {
+			event.data.element.css({
+				width: Math.max(event.pageX - event.data.posX + event.data.width, 0)
+			});
+
+			if (typeof event.data.callback != 'undefined') {
+				event.data.callback.call();
+			}
+			return false;
+		},
+		stop: function (event) {
+			event.data.element.css('opacity', event.data.opacity);
+			$(document).unbind('mousemove.resizer', $.resizeHandle.drag).unbind('mouseup.resizer', $.resizeHandle.stop);
+		}
+	};
+
+	var prop = function (name, elem) {
+		return parseInt(elem.css(name)) || false;
+	};
+
+	$.fn.resizeHandle = function (handle, callback) {
+		return this.each(function() {
+			handle = (handle) ? $(handle) : $(this);
+			handle.bind('mousedown', {elem: $(this), callback: callback}, function (event) {
+				var elem = event.data.elem,
+					data = {
+						element: elem,
+						callback: event.data.callback,
+						width: prop('width', elem) || elem[0].scrollWidth || 0,
+						posX: event.pageX,
+						opacity: elem.css('opacity')
+					};
+				elem.css( {opacity:0.8} );
+
+				$(document)
+					.bind('mousemove.resizer', data, $.resizeHandle.drag)
+					.bind('mouseup.resizer', data, $.resizeHandle.stop);
+
+				return false;
+			});
 		});
 	};
 })(jQuery);
@@ -122,51 +203,14 @@ Razor = {};
 Razor.useFrame = false;
 Razor.currentItem = false;
 Razor.conditions = {};
+Razor.currentlyLoading = null;
 Razor.init = function () {
 	//RazorAPI.init();
 	RazorUI.init();
 };
-Razor.selectItem = function (item) {
-	Razor.currentItem = item;
-	var loading = $('<div class="loading">Loading...</div>');
-	$('#items-list li a.current').removeClass('current');
-	$('#list-item-' + item).children('a').addClass('current');
-	RazorUI.maybeScroll($("#list-item-" + item), $("#items-list"));
-	$('#item-view').html(loading);
-	LilinaAPI.call('items.get', {'id': item}, RazorUI.populateItemView);
-};
-Razor.selectNext = function () {
-	var next = $('#items-list li:has(a.current)').next();
-	if (next.length == 0 && !Razor.currentItem) {
-		next = $('#items-list li:first');
-	}
-	else if (next.length == 0) {
-		RazorUI.showMessage('No next item', 1500);
-		return false;
-	}
-
-	if (next.attr('id') === 'load-more') {
-		RazorUI.loadMoreItems();
-		return;
-	}
-	var id = $('a', next).data('item-id');
-	Razor.selectItem(id);
-};
-Razor.selectPrevious = function () {
-	var prev = $('#items-list li:has(a.current)').prev();
-	if (prev.length == 0 && !Razor.currentItem) {
-		prev = $('#items-list li:first');
-	}
-	else if (prev.length == 0) {
-		alert('No previous item');
-		return false;
-	}
-	var id = $('a', prev).data('item-id');
-	Razor.selectItem(id);
-};
 Razor.api = function (method, conditions, callback) {
 	$.extend(conditions, Razor.conditions);
-	return LilinaAPI.call(method, conditions, callback);
+	return LilinaAPI.call(method, conditions, callback, false, 'GET', Razor.baseURL);
 };
 Razor.getScript = function(url, callback){
 	// This allows caching, unlike $.getScript
@@ -178,6 +222,46 @@ Razor.getScript = function(url, callback){
 		cache: true
 	});
 };
+Razor.lightbox = function (url) {
+	$.fancybox({
+		'transitionIn' : 'none',
+		'transitionOut' : 'none',
+		'type': 'iframe',
+		'href': url
+	});
+	$(document).bind('close-frame', function () {
+		RazorUI.feedLoader = LilinaAPI.call('feeds.getList', {}, RazorUI.populateFeedList);
+		$.fancybox.close();
+	});
+};
+Razor.maybeScroll = function (elem, parent) {
+	elem = $(elem);
+	parent = $(parent);
+
+	var pos = elem.position().top;
+	var parentHeight = parent.innerHeight();
+	var height = elem.outerHeight();
+	if (pos < 0) {
+		Razor.scrollToTop(elem, parent);
+		return true;
+	}
+	else if ((pos + height) > parentHeight) {
+		Razor.scrollToBottom(elem, parent);
+		return true;
+	}
+	return false;
+};
+Razor.scrollToTop = function (elem, parent) {
+	pos = $(parent).scrollTop() + $(elem).position().top;
+	$(parent).stop(true).animate({scrollTop: pos}, 200);
+};
+Razor.scrollToBottom = function (elem, parent) {
+	var pos = $(elem).position().top;
+	var parentHeight = $(parent).innerHeight();
+	var height = $(elem).outerHeight();
+	pos = $(parent).scrollTop() + (pos - parentHeight) + height;
+	$(parent).stop(true).animate({scrollTop: pos}, 200);
+};
 
 RazorUI = {};
 RazorUI.itemCount = 0;
@@ -186,15 +270,19 @@ RazorUI.headerHeight = 59;
 RazorUI.init = function () {
 	$(window).resize(RazorUI.fitToWindow);
 	RazorUI.fitToWindow();
+	$('#items-list-container').resizeHandle('#items-list-container .footer .resize-handle', RazorUI.fitToWindow);
+	$('#sidebar').resizeHandle('#sidebar .footer .resize-handle', RazorUI.fitToWindow);
 
 	$('.relative').toRelativeTime();
+	var loading = $('<div class="loading">Loading...</div>');
+	$("#items-list").html(loading);
 
 	RazorUI.feedLoader = LilinaAPI.call('feeds.getList', {}, RazorUI.populateFeedList);
-	// We'll fix this hardcoded limit later.
 	Razor.api('items.getList', {"limit": 40}, RazorUI.initializeItemList);
+	$('#items-reload').click(RazorUI.reloadItems);
 
 	$('#items-list li a').live('click', RazorUI.handleItemClick);
-	$('#sidebar .expandable > a .arrow')
+	/*$('#sidebar .expandable > a .arrow')
 		.live('click', function() {
 			$(this).parent().blur();
 			$(this).parent().parent().toggleClass('expanded').children('ul').toggle();
@@ -207,20 +295,31 @@ RazorUI.init = function () {
 			return false;
 		})
 		.parent().parent().children('ul')
-			.hide();
+			.hide();*/
 	$('#help a').click(RazorUI.showHelp);
-	$('#update a').click(function () {
+	$('#update a').click(function (e) {
+		e.preventDefault();
 		RazorUI.beginUpdate();
-		return false;
 	});
-	$('#items-list').bind('initialized', function() {
-		$('#load-more').click(RazorUI.loadMoreItems);
-	});
+	$('#items-list')
+		.bind('initialized', function() {
+			$('#load-more').click(RazorUI.loadMoreItems);
+		})
+		.bind('scroll', function () {
+			if (Razor.loading)
+				return;
+
+			var remaining = RazorUI.itemCount - ($('#items-list').scrollTop() + $('#items-list').height()) / $('#items-list li').height();
+			if (remaining < 8)
+				RazorUI.loadMoreItems();
+		});
 	$.hotkeys({
 		"?": RazorUI.showHelp,
-		"j": Razor.selectPrevious,
-		"k": Razor.selectNext,
-		"v": RazorUI.openCurrent
+		"k": RazorUI.selectPrevious,
+		"j": RazorUI.selectNext,
+		"v": RazorUI.openCurrent,
+		"r": RazorUI.reloadItems,
+		"h": RazorUI.showHelp
 	});
 	$('#switcher-sidebar').click(function () {
 		RazorUI.showing = 'sidebar';
@@ -232,31 +331,55 @@ RazorUI.init = function () {
 	});
 
 	/* Sidebar bindings */
-	$('#library-everything').live('click', function () {
+	$('#library-everything').live('click', function (e) {
+		e.preventDefault();
+
+		var loading = $('<div class="loading">Loading...</div>');
+		$("#items-list").html(loading);
 		$('#sidebar .selected').removeClass('selected');
 		$(this).addClass('selected');
 		Razor.conditions.conditions = {};
 
 		Razor.api('items.getList', {"limit": 40}, RazorUI.initializeItemList);
-		return false;
 	});
-	$('#feeds-list .feed').live('click', function () {
+	$('#feeds-list .feed').live('click', function (e) {
+		e.preventDefault();
+
+		var loading = $('<div class="loading">Loading...</div>');
+		$("#items-list").html(loading);
 		$('#sidebar .selected').removeClass('selected');
 		$(this).addClass('selected');
 		Razor.conditions.conditions = {"feed": $(this).data('feed-id')};
 
 		Razor.api('items.getList', {"limit": 40}, RazorUI.initializeItemList);
+	});
+	$('body').click(function () {
+		$('#context-menu').removeClass('active');
+	});
+	$('#feeds-list .feed .menu').live('click', function (e) {
+		var offset = $(this).offset();
+		offset.top += $(this).outerHeight();
+		var feed = 'feed-' + $(this).parent().data('feed-id');
+		var oldFeed = $('#context-menu').data('current');
+		$('#context-menu').data('current', feed).css(offset);
+		if (oldFeed == feed) {
+			$('#context-menu').removeClass('active').data('current', false);
+		}
+		else {
+			$('#context-menu').addClass('active');
+		}
+
 		return false;
 	});
 
 	/* Dynamically load scripts */
 	Razor.getScript(Razor.scriptURL + '/resources/fancybox/fancybox.js', function () {
 		$('#footer-add').click(function (event) {
-			RazorUI.lightbox( $('#header > h1 > a').attr('href') + 'admin/subscribe.php?framed' );
+			Razor.lightbox( $('#header > h1 > a').attr('href') + 'admin/subscribe.php?framed' );
 			event.preventDefault();
 		});
 		$('#item-services a.type-inline').live('click', function (event) {
-			RazorUI.lightbox($(this).attr('href'));
+			Razor.lightbox($(this).attr('href'));
 			event.preventDefault();
 		});
 	});
@@ -271,7 +394,18 @@ RazorUI.init = function () {
 		$('#login a').iconify('user');
 		$('#logout a').iconify('power');
 
-		// this should use deferred objects instead
+		// in case it has already loaded, since we're not using
+		// deferred objects
+		/*$('#feeds-list li .delete').iconify({
+			icon: 'cross',
+			style: {
+				initial: { scale: "0.5833 0.5833" },
+				normal: { fill: '#fff', stroke: 'none' },
+				hover: { fill: '#911515'},
+				active: { fill: '#911515', stroke: '#f00'}
+			}
+		});
+
 		$('#feeds-list').bind('populated', function () {
 			$('#feeds-list li .delete').iconify({
 				icon: 'cross',
@@ -282,53 +416,54 @@ RazorUI.init = function () {
 					active: { fill: '#911515', stroke: '#f00'}
 				}
 			});
-		});
+		});*/
 	});
 };
-RazorUI.lightbox = function (url) {
-	$.fancybox({
-		'transitionIn' : 'none',
-		'transitionOut' : 'none',
-		'type': 'iframe',
-		'href': url
-	});
-	$(document).bind('close-frame', function () {
-		RazorUI.feedLoader = LilinaAPI.call('feeds.getList', {}, RazorUI.populateFeedList);
-		$.fancybox.close();
-	});
-};
-RazorUI.maybeScroll = function (elem, parent) {
-	elem = $(elem);
-	parent = $(parent);
+RazorUI.selectItem = function (item) {
+	Razor.currentItem = item;
+	if (Razor.currentlyLoading !== null) {
+		Razor.currentlyLoading.abort();
+	}
+	var loading = $('<div class="loading">Loading...</div>');
+	$('#items-list li a.current').removeClass('current');
+	$('#list-item-' + item).children('a').addClass('current');
+	Razor.maybeScroll($("#list-item-" + item), $("#items-list"));
+	$('#item-view').html(loading);
 
-	var pos = elem.position().top;
-	var parentHeight = parent.innerHeight();
-	var height = elem.outerHeight();
-	if (pos < 0) {
-		RazorUI.scrollToTop(elem, parent);
-		return true;
-	}
-	else if ((pos + height) > parentHeight) {
-		RazorUI.scrollToBottom(elem, parent);
-		return true;
-	}
-	return false;
+	Razor.currentlyLoading = LilinaAPI.call('items.get', {'id': item}, RazorUI.populateItemView);
 };
-RazorUI.scrollToTop = function (elem, parent) {
-	pos = $(parent).scrollTop() + $(elem).position().top;
-	$(parent).stop(true).animate({scrollTop: pos}, 200);
+RazorUI.selectNext = function () {
+	var next = $('#items-list li:has(a.current)').next();
+	if (next.length == 0 && !Razor.currentItem) {
+		next = $('#items-list li:first');
+	}
+	else if (next.length == 0) {
+		RazorUI.showMessage('No next item', 1500);
+		return false;
+	}
+
+	if (next.attr('id') === 'load-more') {
+		RazorUI.loadMoreItems();
+		return;
+	}
+	var id = $('a', next).data('item-id');
+	RazorUI.selectItem(id);
 };
-RazorUI.scrollToBottom = function (elem, parent) {
-	var pos = $(elem).position().top;
-	var parentHeight = $(parent).innerHeight();
-	var height = $(elem).outerHeight();
-	pos = $(parent).scrollTop() + (pos - parentHeight) + height;
-	$(parent).stop(true).animate({scrollTop: pos}, 200);
+RazorUI.selectPrevious = function () {
+	var prev = $('#items-list li:has(a.current)').prev();
+	if (prev.length == 0 && !Razor.currentItem) {
+		prev = $('#items-list li:first');
+	}
+	else if (prev.length == 0) {
+		alert('No previous item');
+		return false;
+	}
+	var id = $('a', prev).data('item-id');
+	RazorUI.selectItem(id);
 };
 RazorUI.showHelp = function () {
-	var loading = $('<div class="loading">Loading...</div>');
-	$('#item-view').html(loading);
-	LilinaAPI.call('razor.help', {}, RazorUI.populateItemView);
+	Razor.lightbox(Razor.baseURL + "?method=razor.help");
+	return false;
 };
 RazorUI.openCurrent = function () {
 	var current = $('#heading .item-title a').attr('href');
@@ -344,7 +479,7 @@ RazorUI.fitToWindow = function () {
 
 	if (RazorUI.showing != 'full' && normalMode) {
 		$('#sidebar').show();
-		$('#items-list').show();
+		$('#items-list-container').show();
 		RazorUI.showing = 'full';
 	}
 	else if (RazorUI.showing == 'full' && !normalMode) {
@@ -353,36 +488,36 @@ RazorUI.fitToWindow = function () {
 
 	if (RazorUI.showing == 'items') {
 		$('#sidebar').hide();
-		$('#items-list').show();
+		$('#items-list-container').show();
 	}
 	else if (RazorUI.showing == 'sidebar') {
-		$('#items-list').hide();
+		$('#items-list-container').hide();
 		$('#sidebar').show();
 	}
 
 	if (normalMode) {
-		$('#sidebar, #items-list, #item-view').css( {
-			'height': $(window).height() - $('#items-list').position().top
+		$('#sidebar, #items-list-container, #item-view').css( {
+			'height': $(window).height() - $('#items-list-container').position().top
 		});
 	}
 	else {
-		$('#sidebar, #items-list,').css( {
-			'height': $(window).height() - ($('#items-list').position().top + $('#switcher').outerHeight())
+		$('#sidebar, #items-list-container,').css( {
+			'height': $(window).height() - ($('#items-list-container').position().top + $('#switcher').outerHeight())
 		});
 		$('#item-view').css( {
-			'height': $(window).height() - $('#items-list').position().top
+			'height': $(window).height() - $('#items-list-container').position().top
 		});
 	}
 	$('#sidebar .item-list').css( {
 		'height': $('#sidebar').height() - $('#sidebar .footer').outerHeight()
 	});
-	$('#items-list ol').css( {
-		'height': $('#items-list').height() - $('#items-list .footer').outerHeight()
+	$('#items-list').css( {
+		'height': $('#items-list-container').height() - $('#items-list-container .footer').outerHeight()
 	});
 
 	if (normalMode) {
 		$('#item-view').css( {
-			'width': $(window).width() - ($('#sidebar').outerWidth() + $('#items-list').outerWidth())
+			'width': $(window).width() - ($('#sidebar').outerWidth() + $('#items-list-container').outerWidth())
 		});
 	}
 	else {
@@ -391,6 +526,10 @@ RazorUI.fitToWindow = function () {
 		});
 	}
 	var contentHeight = $("#item-view").innerHeight() - ($('#item-content').position().top + $('#item-services').outerHeight() + 20); //header + footer + item header + padding
+	if (Razor.useFrame) {
+		contentHeight += 20;
+	}
+
 	$('#item-content').css( {
 		'height': contentHeight
 	});
@@ -412,7 +551,7 @@ RazorUI.populateFeedList = function (list) {
 
 	RazorUI.feeds = list;
 	$.each(list, function (index, item) {
-		var li = $('<li><a href="#"><img src="" /> <span /><span class="delete" /></a></li>');
+		var li = $('<li><a href="#"><img src="" /> <span /><span class="menu" /></a></li>');
 		var a = $('a', li);
 
 		a.addClass('feed').data('feed-id', item.id).attr('title', item.name);
@@ -423,17 +562,20 @@ RazorUI.populateFeedList = function (list) {
 		else {
 			$('img', li).attr('src', item.icon);
 		}
-		$('.delete', a).addClass('delete').text('Delete');
+		$('.menu', a).text('\u25BC');
 		//a.append(span);
 		$('#feeds-list').append(li);
 	});
 	$('#feeds-list').trigger('populated');
 };
+RazorUI.feedContextMenu = function () {
+	
+};
 RazorUI.initializeItemList = function (list) {
 	RazorUI.itemCount = 0;
-	$('#items-list ol').empty();
+	$('#items-list').empty();
 	var li = $('<li id="load-more"><a href="#">Load More Items</a></li>');
-	$('#items-list ol').append(li);
+	$('#items-list').append(li);
 	RazorUI.feedLoader.success(function () {
 		RazorUI.populateItemList(list);
 	});
@@ -447,7 +589,7 @@ RazorUI.populateItemList = function (list) {
 		var li = $('<li><a href="#"><span class="item-title" /> <span class="sep">from</span> <span class="item-source" /> <span class="sep">at</span> <span class="item-date" /></a></li>');
 		var a = $('a', li);
 
-		a.data('item-id', id).attr('title', item.title).attr('href', '#!/item/' + id);
+		a.data('item-id', id).attr('title', item.title);
 
 		if (!hasTextOverflow) {
 			$('.item-title', li).html( item.title.shorten(45) );
@@ -464,7 +606,7 @@ RazorUI.populateItemList = function (list) {
 		$('.item-source', li).html(feed.name);
 
 		var date = new Date(item.timestamp * 1000);
-		$('.item-date', li).text(date.toUTCString()).toRelativeTime();
+		$('.item-date', li).attr("title", date.toHumanString()).text(date.toRelativeTime());
 
 		li.attr('id', 'list-item-' + id);
 		li.insertBefore('#load-more');
@@ -478,17 +620,31 @@ RazorUI.populateItemList = function (list) {
 	}
 	$('#items-list').trigger('populated');
 };
-RazorUI.loadMoreItems = function () {
-	RazorUI.showMessage('Loading&hellip;');
-	Razor.api('items.getList', {"limit": 20, "start": RazorUI.itemCount}, RazorUI.populateItemList).complete(RazorUI.hideMessage);
+RazorUI.loadMoreItems = function (e) {
+	if (e)
+		e.preventDefault();
 
-	return false;
+	Razor.loading = true
+	RazorUI.showMessage('Loading&hellip;');
+	Razor.api('items.getList', {"limit": 20, "start": RazorUI.itemCount}, RazorUI.populateItemList).complete(function () {
+		RazorUI.hideMessage();
+		Razor.loading = false;
+	});
+};
+RazorUI.reloadItems = function (e) {
+	if (e)
+		e.preventDefault();
+
+	var loading = $('<div class="loading">Loading...</div>');
+	$("#items-list").html(loading);
+	RazorUI.showMessage('Loading&hellip;');
+	Razor.api('items.getList', {"limit": 40}, RazorUI.initializeItemList).complete(RazorUI.hideMessage);
 };
 RazorUI.populateItemView = function (item) {
 	$('#item-view').empty();
-	var basics = $('<div id="item"><div id="heading"><h2 class="item-title"><a /></h2><p class="item-meta"><span class="item-source">From <a /></span>. <span class="item-date">Posted <abbr /></span></p></div><div id="item-content" /></div>');
+	var basics = $('<div id="item"><div id="heading"><h2 class="item-title"><a /></h2><p class="item-meta"><span class="item-source">From <a /></span>. <span class="item-date">Posted <abbr /></span><span class="item-author"> by <a /></span>.</p></div><div id="item-content" /></div>');
 	if (Razor.useFrame) {
-		basics = $('<div id="item"><div id="heading"><h2 class="item-title"><a /></h2><p class="item-meta"><span class="item-source">From <a /></span>. <span class="item-date">Posted <abbr /></span></p></div><iframe id="item-content" class="framed" /></div>');
+		basics = $('<div id="item"><div id="heading"><h2 class="item-title"><a /></h2><p class="item-meta"><span class="item-source">From <a /></span>. <span class="item-date">Posted <abbr /></span><span class="item-author"> by <a /></span>.</p></div><iframe id="item-content" class="framed" /></div>');
 		$('#item-content', basics).attr('src', item.permalink);
 	}
 
@@ -501,13 +657,26 @@ RazorUI.populateItemView = function (item) {
 
 	$('.item-title a', basics).html(item.title).attr('href', item.permalink);
 	$('.item-source a', basics).html(feed.name).attr('href', feed.url).addClass('external');
-	$('.item-date abbr', basics).text(date.toUTCString()).attr('title', date.toUTCString()).toRelativeTime();
+	if (item.author.name == null || item.author.name == false || item.author.name.length == 0) {
+		$('.item-author', basics).remove();
+	}
+	else {
+		$('.item-author a', basics).text(item.author.name);
+
+		if (item.author.url != null && item.author.name != false && item.author.url.length != 0 && item.author.url != false) {
+			$('.item-author a', basics).attr('href', item.author.url).addClass('external');
+		}
+		else {
+			$('.item-author a', basics).replaceWith($('<span />').text(item.author.name));
+		}
+	}
+	$('.item-date abbr', basics).attr("title", date.toHumanString()).text(date.toRelativeTime());
 	if (!Razor.useFrame) {
 		$('#item-content', basics).html(item.content);
 	}
 
+	var item_footer = $('<div class="footer" id="item-services"><ul></ul></div>');
 	if(item.services != undefined) {
-		var item_footer = $('<div class="footer" id="item-services"><ul></ul></div>');
 		$.each(item.services, function (index, service) {
 			var service_item = $('<li><a></a></li>');
 			$('a', service_item)
@@ -516,17 +685,19 @@ RazorUI.populateItemView = function (item) {
 				.attr('href', service.action);
 			$('ul', item_footer).append(service_item);
 		});
-		$(basics).append(item_footer);
 	}
+	$(basics).append(item_footer);
 
 	$('#item-view').html(basics);
 	$('#item-content').focus();
 	RazorUI.fitToWindow();
 	$('#item-view').trigger('populated');
 };
-RazorUI.handleItemClick = function () {
+RazorUI.handleItemClick = function (e) {
+	e.preventDefault();
+
 	var id = $(this).data('item-id');
-	Razor.selectItem(id);
+	RazorUI.selectItem(id);
 };
 RazorUI.beginUpdate = function () {
 	$('#update').hide();
@@ -556,8 +727,7 @@ RazorUI.finishUpdate = function () {
 	RazorUI.showMessage('Done!', 1000);
 	$('#update').show();
 	if(Razor.updated > 0) {
-		Razor.api('items.getList', {"limit": 40}, RazorUI.initializeItemList);
-		//$('#menu').prepend($('<li>New items are available. Reload to view.</li>'));
+		Razor.reloadItems();
 	}
 
 };

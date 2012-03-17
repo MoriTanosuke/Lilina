@@ -36,7 +36,7 @@ function relative_time($posted_date) {
 	$seconds = $diff;
  
 	if ($months > 0) {
-		return sprintf(_c('on %s', 'on <date>'), date('N, jS \o\f F, Y'));
+		return sprintf(_c('on %s', 'on <date>'), date('l, jS \o\f F, Y'));
 	}
 
 	switch (true) {
@@ -95,7 +95,7 @@ if (count(Feeds::get_instance()->getAll()) === 0) {
 else {
 	$updated = get_option('last_updated');
 	if (!$updated) {
-		$message = sprintf(_r('You currently have %d items in %d feeds. Never updated.', count(Items::get_instance()->get_items()), count(Feeds::get_instance()->getAll())));
+		$message = sprintf(_r('You currently have %d items in %d feeds. Never updated.'), count(Items::get_instance()->get_items()), count(Feeds::get_instance()->getAll()));
 	}
 	else {
 		$message = sprintf(_r('You currently have %d items in %d feeds. Last updated %s.'), count(Items::get_instance()->get_items()), count(Feeds::get_instance()->getAll()), relative_time($updated));
@@ -115,8 +115,8 @@ else {
 </ul>
 <p class="sidenote"><?php echo sprintf(_r('Looking to import from another service? Try our <a href="%s">open documentation</a> to see what other users have found.'), 'http://getlilina.org/wiki/importing') ?></p>
 <h2><?php _e('Quick Adding') ?></h2>
-<p><?php _e('Use this bookmarlet to subscribe to feeds straight from your browser:')?> 
-<a href="javascript:void(sp=window.open('<?php echo get_option('baseurl') ?>admin/subscribe.php?url='+escape(document.location),'lilina','toolbar=no,resizable=no,width=450,height=430,scrollbars=yes'));%20void(setTimeout(function(){sp.focus()},100));"><?php _e('Subscribe') ?></a></p>
+<p><?php _e('Use this bookmarlet to subscribe to feeds straight from your browser:')?><br />
+<a href="javascript:void(sp=window.open('<?php echo get_option('baseurl') ?>admin/subscribe.php?url='+escape(document.location),'lilina','toolbar=no,resizable=no,width=450,height=430,scrollbars=yes'));%20void(setTimeout(function(){sp.focus()},100));" class="bookmarklet"><?php _e('Subscribe') ?></a></p>
 <h2><?php _e('Updating Your Feeds') ?></h2>
 <p><?php _e('Lilina offers several ways to update your feeds. Some templates offer an update button, while others leave it to you to work out.') ?></p>
 <p><?php printf(_r('To update your feeds from your browser, simply access <a href="%1$s">the updater</a> in your browser. You can also access this URL via cron, by appending <code>&amp;cron</code>.'), get_option('baseurl') . '?method=update') ?></p>

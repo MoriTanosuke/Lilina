@@ -23,21 +23,6 @@ if (isset($_POST['activate_template'])) {
 		die();
 	}
 }
-if(isset($_REQUEST['activate_plugin'])) {
-	activate_plugin($_REQUEST['activate_plugin']);
-	
-	header('HTTP/1.1 302 Found', true, 302);
-	header('Location: ' . get_option('baseurl') . 'admin/settings.php?activated=1');
-	die();
-}
-elseif(isset($_REQUEST['deactivate_plugin'])) {
-	deactivate_plugin($_REQUEST['deactivate_plugin']);
-	
-	header('HTTP/1.1 302 Found', true, 302);
-	header('Location: ' . get_option('baseurl') . 'admin/settings.php?deactivated=1');
-	die();
-}
-
 
 if(!empty($_POST['action']) && $_POST['action'] == 'settings' && !empty($_POST['_nonce'])) {
 	if(!check_nonce('settings', $_POST['_nonce']))
@@ -90,7 +75,7 @@ if(!empty($_GET['template_changed']))
 	<fieldset id="views">
 		<legend><?php _e('Viewing Settings'); ?></legend>
 		<div class="row">
-			<label for="locale"><?php _e('Language') ?></label>
+			<label for="locale"><?php _e('Language') ?>:</label>
 			<select id="locale" name="locale">
 				<?php
 				foreach(available_locales() as $locale) {
@@ -107,13 +92,33 @@ if(!empty($_GET['template_changed']))
 			<label for="timezone"><?php _e('Timezone'); ?>:</label>
 			<select id="timezone" name="timezone">
 				<?php
-				foreach(timezone_identifiers_list() as $tz) {
-					echo '<option';
-					if($tz === get_option('timezone')) {
-						echo ' selected="selected"';
+					$ids = DateTimeZone::listIdentifiers();
+					$real = array();
+					foreach ($ids as $id) {
+						if (strpos($id, '/') !== false) {
+							list($continent, $city) = explode('/', $id);
+						}
+						else {
+							$continent = 'Other';
+							$city = $id;
+						}
+						if (empty($real[$continent])) {
+							$real[$continent] = array();
+						}
+						$real[$continent][$city] = $id;
 					}
-					echo '>', $tz, '</option>';
-				}
+
+					foreach ($real as $continent => $cities) {
+						echo '<optgroup label="' . $continent . '">';
+						foreach($cities as $city => $tz) {
+							echo '<option';
+							if($tz === get_option('timezone')) {
+								echo ' selected="selected"';
+							}
+							echo ' value="' . $tz . '">' . $city . '</option>';
+						}
+						echo '</optgroup>';
+					}
 				?>
 			</select>
 		</div>
@@ -162,56 +167,18 @@ if(!empty($_GET['template_changed']))
 ?>
 					<h2><?php echo $title ?></h2>
 					<p><?php echo $template->description ?></p>
+<?php
+					if ($template->slug !== get_option('template')) {
+?>
 					<button type="submit" name="activate_template" value="<?php echo $template->slug ?>">Activate</button>
+<?php
+					}
+?>
 				</div>
 <?php
 			}
 ?>
 		</div>
-	</fieldset>
-</form>
-<form action="settings.php" method="post">
-	<fieldset id="plugins">
-		<legend><?php _e('Plugin Management'); ?></legend>
-		<table class="item-table">
-			<thead>
-				<tr>
-					<th scope="col"><?php _e('Plugin') ?></th>
-					<th scope="col"><?php _e('Version') ?></th>
-					<th scope="col"><?php _e('Description') ?></th>
-					<th scope="col"><?php _e('Status') ?></th>
-					<th scope="col"><?php _e('Action') ?></th>
-				</tr>
-			</thead>
-			<tbody>
-<?php
-foreach(lilina_plugins_list(get_plugin_dir()) as $plugin):
-	global $current_plugins;
-	$plugin_meta = plugins_meta($plugin);
-	$plugin_file = str_replace(get_plugin_dir(), '', $plugin);
-?>
-				<tr>
-					<td><?php echo $plugin_meta->name ?></td>
-					<td><?php echo $plugin_meta->version ?></td>
-					<td><?php echo $plugin_meta->description ?></td>
-					<td><?php if(isset($current_plugins[md5($plugin_file)])) _e('Activated'); else _e('Deactivated'); ?></td>
-<?php
-if( isset($current_plugins[md5($plugin_file)]) ):
-?>
-					<td><a href="settings.php?deactivate_plugin=<?php echo $plugin_file ?>" class="button negative"><?php  _e('Deactivate') ?></a></td>
-<?php
-else:
-?>
-					<td><a href="settings.php?activate_plugin=<?php echo $plugin_file ?>" class="button positive"><?php  _e('Activate') ?></a></td>
-<?php
-endif;
-?>
-				</tr>
-<?php
-endforeach;
-?>
-			</tbody>
-		</table>
 	</fieldset>
 </form>
 <?php
